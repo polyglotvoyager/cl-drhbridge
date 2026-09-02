@@ -1,0 +1,51 @@
+(ql:quickload :hunchensocket)
+(:HUNCHENSOCKET)
+
+MY-SBCL> (defclass chat-room (hunchensocket:websocket-resource)
+           ((name :initarg :name :initform (error "name this room") :reader name))
+           (:default-initargs :client-class 'user))
+#<STANDARD-CLASS MY-SBCL::CHAT-ROOM>
+
+MY-SBCL> (defclass user (hunchensocket:websocket-client)
+           ((name :initarg :user-agent :reader name :initform (error "name this user"))))
+#<STANDARD-CLASS MY-SBCL::USER>
+
+MY-SBCL> (defvar *chat-rooms* (list (make-instance 'chat-room :name "/bongo")))
+*CHAT-ROOMS*
+
+MY-SBCL> (defun find-room (request) (find (hunchentoot:script-name request) *chat-rooms* :test #'string= :key #'name))
+FIND-ROOM
+
+MY-SBCL> (pushnew 'find-room hunchensocket:*websocket-dispatch-table*)
+(FIND-ROOM)
+
+MY-SBCL> (defun broadcast (room message &rest args)
+           (loop for peer in (hunchensocket:clients room)
+                 do (hunchensocket:send-text-message peer (apply #'format nil message args))))
+BROADCAST
+
+MY-SBCL> (defmethod hunchensocket:client-connected ((room chat-room) user)
+           (broadcast room "~a has joined" (name user)))
+#<STANDARD-METHOD HUNCHENSOCKET:CLIENT-CONNECTED (CHAT-ROOM T) {10086DE893}>
+
+MY-SBCL> (defmethod hunchensocket:client-disconnected ((room chat-room) user)
+           (broadcast room "~a has left" (name user)))
+#<STANDARD-METHOD HUNCHENSOCKET:CLIENT-DISCONNECTED (CHAT-ROOM T) {100879AA43}>
+
+MY-SBCL> (defmethod hunchensocket:text-message-received ((room chat-room) user message)
+           (broadcast room "~a says ~a" (name user) message))
+#<STANDARD-METHOD HUNCHENSOCKET:TEXT-MESSAGE-RECEIVED (CHAT-ROOM T T) {10017F2E33}>
+
+MY-SBCL> (defvar *server* (make-instance 'hunchensocket:websocket-acceptor :port 12345))
+*SERVER*
+
+MY-SBCL> (hunchentoot:start *server*)
+#<HUNCHENSOCKET:WEBSOCKET-ACCEPTOR (host *, port 12345)>
+127.0.0.1 - [2026-09-02 16:39:30] "GET /bongo HTTP/1.1" 101 0 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+
+MY-SBCL> (defmethod hunchensocket:client-connected ((room chat-room) user)
+           (let ((username (hunchentoot:parameter "username" (hunchensocket:client-request user)))) (broadcast room "~a has joined ~a" username (name room))))
+
+HTML/JS
+
+conn = new WebSocket("ws://localhost:12345/bongo?username=" + gameUsername);
