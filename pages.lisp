@@ -1,0 +1,175 @@
+(defvar *play-html* "<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>Play - DrH Bridge</title>
+    <script type='text/javascript'>
+    const urlParams = new URLSearchParams(window.location.search);
+    const fullUsername = urlParams.get('username');
+    const gameUsername = fullUsername.replaceAll('debug', '');
+
+    window.onload = function () {
+      console.log('playing as ' + gameUsername);
+      document.getElementById('usernameLabel').innerText = gameUsername;
+
+      let conn;
+      const userinput = document.getElementById('userinput');
+      const prompt = document.getElementById('prompt');
+      const log = document.getElementById('log');
+
+      function setPoints(points) {
+        document.getElementById('pointsLabel').innerText = points.substring(1);
+      }
+
+      function setPrompt(message) {
+        prompt.innerText = message.substring(1).replaceAll('#', '\\n');
+      }
+
+      function appendLog(item) {
+        const doScroll = log.scrollTop > log.scrollHeight - log.clientHeight - 1;
+        log.appendChild(item);
+        if (doScroll) {
+          log.scrollTop = log.scrollHeight - log.clientHeight;
+        }
+      }
+
+      document.getElementById('form').onsubmit = function () {
+        if (!conn) {
+          return false;
+        }
+        if (!userinput.value) {
+          return false;
+        }
+        conn.send(gameUsername + '/' + userinput.value);
+        userinput.value = '';
+        userinput.focus();
+        return false;
+      };
+
+      if (window['WebSocket']) {
+        if (fullUsername.startsWith('debug')) {
+          conn = new WebSocket('ws://' + document.location.host + '/drhbridge/ws?username=' + gameUsername);
+        } else {
+          conn = new WebSocket('wss://' + document.location.host + '/drhbridge/ws?username=' + gameUsername);
+        }
+        conn.onopen = function () {
+          conn.send(`${gameUsername}/private/Welcome!`);
+          conn.send(`${gameUsername}/join/`);
+          conn.send(`${gameUsername}/${gameUsername}hand/`);
+        }
+        conn.onclose = function (evt) {
+          conn.send(`${gameUsername}/leave/`);
+          conn.send(`Game server/chat/${gameUsername} left.`);
+          const item = document.createElement('div');
+          item.innerText = 'This connection was closed. Reload this page to reconnect.';
+          appendLog(item);
+        };
+        conn.onmessage = function (evt) {
+          const messages = evt.data.split('\\n');
+          for (let i = 0; i < messages.length; i++) {
+            const item = document.createElement('div');
+            item.innerText = messages[i];
+            if (messages[i].charAt(0) === '%') {
+              setPrompt(messages[i]);
+            } else if (messages[i].charAt(0) === '*') {
+              setPoints(messages[i]);
+            } else {
+              appendLog(item);
+            }
+          }
+        };
+      } else {
+        const item = document.createElement('div');
+        item.innerHTML = '<b>Your browser does not support WebSockets.</b>';
+        appendLog(item);
+      }
+    };
+    </script>
+    <style type='text/css'>
+    html {
+      height: 96vh;
+      font-family: sans-serif;
+    }
+
+    body {
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: papayawhip;
+    }
+
+    #promptWrapper {
+      background-color: #555;
+      height: 15%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #prompt {
+      display: flex;
+      color: #bfa;
+      font-size: 1.1rem;
+      font-family: sans-serif;
+    }
+
+    #log {
+      background: white;
+      height: 15.2rem;
+      margin: 0;
+      padding: 0.5em 0.5em 0.5em 0.5em;
+      overflow: auto;
+      font-size: 0.8rem;
+    }
+
+    #form {
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 10%;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #userinput {
+      margin-left: 1rem;
+      padding: 0.25rem;
+    }
+
+    #submitbutton {
+      font-size: 1rem;
+    }
+
+    </style>
+  </head>
+  <body>
+    <div id='promptWrapper'>
+      <pre id='prompt'>Please wait...</pre>
+    </div>
+    <form id='form'>
+      <div style='text-align: center;'>
+        <span id='usernameLabel'></span>:&nbsp;
+        <span id='pointsLabel'>0</span>&nbsp;point(s)
+        <br>
+        <input type='text' id='userinput' size='16' autofocus />
+        <input type='submit' id='submitbutton' value='Send or hit enter' />
+      </div>
+    </form>
+
+    <div>
+      <button onclick='sendPass()'>Pass</button>
+    </div>
+    <div id='log'></div>
+
+    <script>
+    function sendPass() {
+      document.getElementById('userinput').value = `bid/0 0 pass`;
+      document.getElementById('submitbutton').click();
+    }
+    </script>
+  </body>
+</html>")
