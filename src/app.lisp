@@ -1,3 +1,5 @@
+(in-package :drhbridge)
+
 (defvar *server* nil)
 (defvar *port* 8100)
 (defvar *address* "::")
@@ -36,10 +38,12 @@
      hunchentoot:easy-acceptor)
   ())
 
-(setf *server* (make-instance 'my-acceptor :port *port* :address *address*))
-
 (hunchentoot:define-easy-handler (play :uri "/drhbridge/play") ()
   (setf (hunchentoot:content-type*) "text/html")
   *play-html*)
 
-(hunchentoot:start *server*)
+(defun start-server ()
+  (setf *port* (parse-integer (nth 1 sb-ext:*posix-argv*)))
+  (setf *server* (make-instance 'my-acceptor :port *port* :address *address*))
+  (hunchentoot:start *server*)
+  (sleep most-positive-fixnum))

@@ -1,3 +1,5 @@
+(in-package :drhbridge)
+
 (defvar *play-html* "<!DOCTYPE html>
 <html lang='en'>
   <head>
